@@ -17,23 +17,27 @@ class ChainRouter:
     Routes user queries to the appropriate chain based on classification.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini"):
+    def __init__(self, model: str = "gpt-4o-mini", thread_id: Optional[str] = None, memory: Optional[Any] = None):
         """
         Initialize the chain router with all chain types.
         
         Args:
             model: OpenAI model to use for all chains
+            thread_id: Thread ID for memory management
+            memory: Shared memory instance
         """
         self.model = model
-        self._setup_chains()
+        self.thread_id = thread_id
+        self.memory = memory
+        self._setup_chains(thread_id, memory)
     
-    def _setup_chains(self):
+    def _setup_chains(self, thread_id: Optional[str] = None, memory: Optional[Any] = None):
         """Initialize all the chain handlers."""
-        self.classification_chain = ClassificationChain(self.model)
-        self.news_chain = NewsChain(self.model)
-        self.finance_chain = FinanceChain(self.model)
-        self.general_chain = GeneralChain(self.model)
-        self.reset_chain = ResetChain(self.model)
+        self.classification_chain = ClassificationChain(self.model, thread_id, memory)
+        self.news_chain = NewsChain(self.model, thread_id=thread_id, memory=memory)
+        self.finance_chain = FinanceChain(self.model, thread_id=thread_id, memory=memory)
+        self.general_chain = GeneralChain(self.model, thread_id, memory)
+        self.reset_chain = ResetChain(self.model, thread_id, memory)
         
         # Chain routing map
         self.chain_map = {
@@ -100,20 +104,35 @@ class ChainRouter:
             memory = memory_manager.get_memory(thread_id)
             chat_history = memory_manager.get_chat_history_string(memory)
             
+            # Create chains with shared memory and thread_id
+            classification_chain = ClassificationChain(self.model, thread_id, memory)
+            news_chain = NewsChain(self.model, thread_id=thread_id, memory=memory)
+            finance_chain = FinanceChain(self.model, thread_id=thread_id, memory=memory)
+            general_chain = GeneralChain(self.model, thread_id, memory)
+            reset_chain = ResetChain(self.model, thread_id, memory)
+            
+            # Update chain_map with new instances
+            chain_map = {
+                "최신소식": news_chain,
+                "전문지식": finance_chain,
+                "리셋": reset_chain,
+                "기타": general_chain
+            }
+            
             # Classify the question
             classification_input = {
                 "question": question,
                 "chat_history": chat_history
             }
-            topic = self.classification_chain.invoke(classification_input)
+            topic = classification_chain.invoke(classification_input)
             
             # Handle reset requests
             if topic.strip() == "리셋":
                 memory_manager.reset_memory(thread_id)
-                return self.reset_chain.invoke({"question": question})
+                return reset_chain.invoke({"question": question})
             
             # Route to appropriate chain
-            selected_chain = self.route(topic)
+            selected_chain = chain_map.get(topic.strip(), general_chain)
             chain_input = {
                 "question": question,
                 "chat_history": chat_history
@@ -126,6 +145,18 @@ class ChainRouter:
             return response
         
         return RunnableLambda(process_with_memory)
+    
+    def update_chains_with_memory(self, thread_id: str, memory):
+        """
+        Update all chains with new memory and thread_id.
+        
+        Args:
+            thread_id: Thread ID for memory management
+            memory: Shared memory instance
+        """
+        self.thread_id = thread_id
+        self.memory = memory
+        self._setup_chains(thread_id, memory)
     
     async def aprocess_query(self, question: str, chat_history: str = "") -> str:
         """

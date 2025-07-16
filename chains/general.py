@@ -5,7 +5,7 @@ General chain for handling miscellaneous queries.
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class GeneralChain:
@@ -13,14 +13,18 @@ class GeneralChain:
     Handles general queries that don't fit into specific categories.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini"):
+    def __init__(self, model: str = "gpt-4o-mini", thread_id: Optional[str] = None, memory: Optional[Any] = None):
         """
         Initialize the general chain.
         
         Args:
             model: OpenAI model to use for response generation
+            thread_id: Thread ID for memory management
+            memory: Shared memory instance
         """
         self.model = model
+        self.thread_id = thread_id
+        self.memory = memory
         self._setup_chain()
     
     def _setup_chain(self):
@@ -60,6 +64,11 @@ Answer:
         Returns:
             General response or polite refusal
         """
+        # Use shared memory if available, otherwise use provided chat_history
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            chat_history = memory_manager.get_chat_history_string(self.memory)
+        
         return self.chain.invoke({
             "question": question,
             "chat_history": chat_history
@@ -75,6 +84,12 @@ Answer:
         Returns:
             General response as string
         """
+        # Use shared memory if available
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            inputs = inputs.copy()
+            inputs["chat_history"] = memory_manager.get_chat_history_string(self.memory)
+        
         return self.chain.invoke(inputs)
     
     async def ainvoke(self, inputs: Dict[str, Any]) -> str:
@@ -87,6 +102,12 @@ Answer:
         Returns:
             General response as string
         """
+        # Use shared memory if available
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            inputs = inputs.copy()
+            inputs["chat_history"] = memory_manager.get_chat_history_string(self.memory)
+        
         return await self.chain.ainvoke(inputs)
     
     def get_chain(self):

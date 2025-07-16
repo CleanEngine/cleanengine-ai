@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_community.retrievers.tavily_search_api import TavilySearchAPIRetriever
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class NewsChain:
@@ -14,16 +14,20 @@ class NewsChain:
     Handles queries about latest news and current events using web search.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", search_k: int = 3):
+    def __init__(self, model: str = "gpt-4o-mini", search_k: int = 3, thread_id: Optional[str] = None, memory: Optional[Any] = None):
         """
         Initialize the news chain.
         
         Args:
             model: OpenAI model to use for response generation
             search_k: Number of search results to retrieve
+            thread_id: Thread ID for memory management
+            memory: Shared memory instance
         """
         self.model = model
         self.search_k = search_k
+        self.thread_id = thread_id
+        self.memory = memory
         self._setup_chain()
     
     def _setup_chain(self):
@@ -71,6 +75,11 @@ Answer:"""
         Returns:
             Response based on latest news data
         """
+        # Use shared memory if available, otherwise use provided chat_history
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            chat_history = memory_manager.get_chat_history_string(self.memory)
+        
         return self.chain.invoke({
             "question": question,
             "chat_history": chat_history
@@ -86,6 +95,12 @@ Answer:"""
         Returns:
             News-based response as string
         """
+        # Use shared memory if available
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            inputs = inputs.copy()
+            inputs["chat_history"] = memory_manager.get_chat_history_string(self.memory)
+        
         return self.chain.invoke(inputs)
     
     async def ainvoke(self, inputs: Dict[str, Any]) -> str:
@@ -98,6 +113,12 @@ Answer:"""
         Returns:
             News-based response as string
         """
+        # Use shared memory if available
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            inputs = inputs.copy()
+            inputs["chat_history"] = memory_manager.get_chat_history_string(self.memory)
+        
         return await self.chain.ainvoke(inputs)
     
     def get_chain(self):

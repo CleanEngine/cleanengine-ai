@@ -16,16 +16,20 @@ class FinanceChain:
     Handles queries about financial expert knowledge using vector database search.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", search_k: int = 3):
+    def __init__(self, model: str = "gpt-4o-mini", search_k: int = 3, thread_id: Optional[str] = None, memory: Optional[Any] = None):
         """
         Initialize the finance chain.
         
         Args:
             model: OpenAI model to use for response generation
             search_k: Number of search results to retrieve from vector DB
+            thread_id: Thread ID for memory management
+            memory: Shared memory instance
         """
         self.model = model
         self.search_k = search_k
+        self.thread_id = thread_id
+        self.memory = memory
         self.use_milvus = False
         self.vectorstore = None
         self._setup_milvus()
@@ -120,6 +124,11 @@ Question: {question}
         Returns:
             Response based on financial expert knowledge
         """
+        # Use shared memory if available, otherwise use provided chat_history
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            chat_history = memory_manager.get_chat_history_string(self.memory)
+        
         return self.chain.invoke({
             "question": question,
             "chat_history": chat_history
@@ -135,6 +144,12 @@ Question: {question}
         Returns:
             Finance-based response as string
         """
+        # Use shared memory if available
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            inputs = inputs.copy()
+            inputs["chat_history"] = memory_manager.get_chat_history_string(self.memory)
+        
         return self.chain.invoke(inputs)
     
     async def ainvoke(self, inputs: Dict[str, Any]) -> str:
@@ -147,6 +162,12 @@ Question: {question}
         Returns:
             Finance-based response as string
         """
+        # Use shared memory if available
+        if self.memory:
+            from modules.memory_manager import memory_manager
+            inputs = inputs.copy()
+            inputs["chat_history"] = memory_manager.get_chat_history_string(self.memory)
+        
         return await self.chain.ainvoke(inputs)
     
     def get_chain(self):

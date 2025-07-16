@@ -5,7 +5,7 @@ Reset chain for handling conversation reset requests.
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class ResetChain:
@@ -13,14 +13,18 @@ class ResetChain:
     Handles conversation reset requests.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini"):
+    def __init__(self, model: str = "gpt-4o-mini", thread_id: Optional[str] = None, memory: Optional[Any] = None):
         """
         Initialize the reset chain.
         
         Args:
             model: OpenAI model to use for response generation
+            thread_id: Thread ID for memory management
+            memory: Shared memory instance
         """
         self.model = model
+        self.thread_id = thread_id
+        self.memory = memory
         self._setup_chain()
     
     def _setup_chain(self):
